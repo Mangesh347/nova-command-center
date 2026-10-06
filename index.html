@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nova Command Center</title>
+<meta name="description" content="Talk to Nova, the AI chief of staff, and watch every team work live.">
+<meta name="theme-color" content="#0A0D18">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Tokens ─────────────────────────────────────────────────────────
+   Night sky (space ink) + nova gold core + nebula violet links.
+   Coral is reserved for alerts only. Radius philosophy: soft (12px). */
+:root {
+  --ink-950:#070A13; --ink-900:#0A0D18; --ink-850:#0F1322; --ink-800:#141A2D; --ink-700:#1E2640;
+  --ink-600:#2B3557; --ink-400:#5A6688; --ink-300:#8C95AB; --ink-100:#D6DBE7; --ink-50:#EEF1F7;
+  --gold:#FFC857; --gold-soft:#FFE3A3; --violet:#8B7CF6; --violet-soft:#B7ADFF;
+  --coral:#FF7A59; --mint:#5BD6A8;
+  --bg:var(--ink-900); --panel:var(--ink-850); --panel-2:var(--ink-800); --line:var(--ink-700);
+  --text:var(--ink-50); --muted:var(--ink-300); --accent:var(--gold); --link:var(--violet);
+  --radius:12px; --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
+  --nova-text:var(--gold-soft); --fast:120ms; --base:200ms; --slow:320ms;
+  --shadow-1:0 1px 2px rgb(0 0 0/.35); --shadow-2:0 2px 8px rgb(0 0 0/.35),0 1px 2px rgb(0 0 0/.3);
+  --display:'Sora',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg:#EEF1F7; --panel:#FFFFFF; --panel-2:#F5F7FB; --line:#D6DBE7; --text:#141A2D;
+    --muted:#4A5576; --accent:#B7791F; --link:#5B4BD6; --gold:#D99A1E; --violet:#5B4BD6; --coral:#D2502F; --nova-text:#8A5A0B;
+    --shadow-1:0 1px 2px rgb(20 26 45/.08); --shadow-2:0 2px 8px rgb(20 26 45/.08),0 1px 2px rgb(20 26 45/.06);
+  }
+}
+:root[data-theme="light"] {
+  --bg:#EEF1F7; --panel:#FFFFFF; --panel-2:#F5F7FB; --line:#D6DBE7; --text:#141A2D;
+  --muted:#4A5576; --accent:#B7791F; --link:#5B4BD6; --gold:#D99A1E; --violet:#5B4BD6; --coral:#D2502F; --nova-text:#8A5A0B;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 var(--display); }
+body { min-height:100dvh; }
+button,input,select,textarea { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:6px; }
+.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.app { display:grid; grid-template-columns:1fr; gap:var(--s4); padding:var(--s4); max-width:1440px; margin:0 auto; }
+@media (min-width:1100px){ .app { grid-template-columns:340px 1fr 380px; padding:var(--s5); gap:var(--s5); min-height:100dvh; } }
+header.top { order:-2; grid-column:1/-1; display:flex; align-items:center; gap:var(--s3); }
+.brand { font-weight:700; letter-spacing:-.01em; font-size:18px; display:flex; align-items:center; gap:var(--s2); }
+.brand .dot { width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 12px var(--accent); }
+.top .spacer { flex:1; }
+.pill { font:500 12px/1 var(--mono); padding:6px 10px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+.pill.live { color:var(--mint); border-color:color-mix(in srgb,var(--mint) 40%,transparent); }
+.pill.off { color:var(--coral); }
+.icon-btn { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:8px 12px; cursor:pointer; transition:background var(--fast) ease-out; }
+.icon-btn:hover { background:var(--panel-2); }
+
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-1); padding:var(--s4); min-width:0; }
+.panel h2 { font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 var(--s3); display:flex; align-items:center; gap:var(--s2); }
+.panel h2 .count { font-family:var(--mono); color:var(--accent); letter-spacing:0; }
+
+/* ── Center: orb + stats ───────────────────────────────────────── */
+.center { order:-1; display:flex; flex-direction:column; align-items:center; gap:var(--s4); }
+.orb-wrap { position:relative; width:min(78vw,380px); aspect-ratio:1; }
+@media (min-width:1100px){ .orb-wrap { width:min(36vw,440px); } }
+#orb { width:100%; height:100%; display:block; border-radius:50%; cursor:pointer; }
+.orb-btn { position:absolute; inset:0; border:0; background:transparent; border-radius:50%; cursor:pointer; }
+@media (min-width:1100px){ .center { order:0; } }
+.state { font:500 13px/1.4 var(--mono); color:var(--muted); text-align:center; min-height:1.4em; }
+.said { text-align:center; max-width:640px; font-size:17px; line-height:1.5; min-height:3em; }
+.said .who { display:block; font:500 11px/1 var(--mono); color:var(--muted); letter-spacing:.08em; text-transform:uppercase; margin-bottom:var(--s2); }
+.said.nova { color:var(--nova-text); }
+.ask { display:flex; gap:var(--s2); width:100%; max-width:640px; }
+.ask input { flex:1; min-width:0; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; }
+.ask button, .btn { background:var(--accent); color:#1a1405; border:0; border-radius:var(--radius); padding:12px 16px; font-weight:600; cursor:pointer; transition:transform var(--fast) ease-out, filter var(--fast); }
+.ask button:hover,.btn:hover { filter:brightness(1.06); } .ask button:active,.btn:active { transform:scale(.98); }
+.btn.ghost { background:transparent; color:var(--text); border:1px solid var(--line); }
+.btn.no { background:transparent; color:var(--coral); border:1px solid color-mix(in srgb,var(--coral) 50%,transparent); }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s2); width:100%; max-width:640px; }
+.stat { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:var(--s3); }
+.stat b { display:block; font:600 22px/1.1 var(--display); letter-spacing:-.01em; }
+.stat span { font:500 11px/1.3 var(--mono); color:var(--muted); }
+.stat.warn b { color:var(--coral); } .stat.gold b { color:var(--accent); }
+@media (max-width:520px){ .stats { grid-template-columns:repeat(2,1fr); } }
+
+/* ── Team graph ────────────────────────────────────────────────── */
+#graph { width:100%; height:auto; display:block; }
+#graph .edge { fill:none; stroke:var(--violet); stroke-opacity:.35; stroke-width:1.5; }
+#graph .edge.on { stroke:var(--gold); stroke-opacity:.9; stroke-dasharray:4 6; animation:flow 1.2s linear infinite; }
+@keyframes flow { to { stroke-dashoffset:-20; } }
+#graph .node rect { fill:var(--panel-2); stroke:var(--line); }
+#graph .node.on rect { stroke:var(--gold); }
+#graph .node text { fill:var(--text); font:600 11px var(--display); }
+#graph .node .sub { fill:var(--muted); font:400 9px var(--mono); }
+#graph .node .led { fill:var(--ink-400); } #graph .node.on .led { fill:var(--gold); }
+.team-list { list-style:none; margin:var(--s3) 0 0; padding:0; display:grid; gap:var(--s2); }
+.team-list li { display:flex; justify-content:space-between; gap:var(--s2); font-size:13px; border-top:1px solid var(--line); padding-top:var(--s2); }
+.team-list li span:last-child { color:var(--muted); text-align:right; }
+
+/* ── Feed / approvals / alerts ─────────────────────────────────── */
+.side { display:flex; flex-direction:column; gap:var(--s4); min-width:0; }
+.feed { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--s2); max-height:52vh; overflow:auto; }
+.msg { border:1px solid var(--line); border-radius:var(--radius); padding:var(--s2) var(--s3); background:var(--panel-2); }
+.msg .meta { font:500 11px/1.4 var(--mono); color:var(--muted); display:flex; justify-content:space-between; gap:var(--s2); }
+.msg .meta .route b { color:var(--text); font-weight:500; }
+.msg .meta .route .to { color:var(--link); }
+.msg p { margin:var(--s1) 0 0; font-size:13px; overflow-wrap:anywhere; }
+.msg.nova { border-color:color-mix(in srgb,var(--gold) 35%,var(--line)); }
+.msg.alert { border-color:color-mix(in srgb,var(--coral) 55%,var(--line)); }
+.appr { list-style:none; margin:0; padding:0; display:grid; gap:var(--s2); }
+.appr li { border:1px solid var(--line); border-radius:var(--radius); padding:var(--s3); background:var(--panel-2); }
+.appr .id { font:500 12px var(--mono); color:var(--accent); }
+.appr p { margin:var(--s1) 0 var(--s2); font-size:13px; }
+.appr .row { display:flex; gap:var(--s2); }
+.appr .row .btn { padding:8px 14px; font-size:13px; }
+.empty { color:var(--muted); font-size:13px; padding:var(--s3); border:1px dashed var(--line); border-radius:var(--radius); }
+.skel { height:44px; border-radius:var(--radius); background:linear-gradient(90deg,var(--panel-2),var(--line),var(--panel-2)); background-size:200% 100%; animation:sh 1.4s ease-in-out infinite; }
+@keyframes sh { to { background-position:-200% 0; } }
+
+/* ── Setup dialog ──────────────────────────────────────────────── */
+dialog { border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); color:var(--text); padding:var(--s5); width:min(560px,calc(100vw - 32px)); box-shadow:var(--shadow-2); }
+dialog::backdrop { background:rgb(5 7 14/.7); }
+dialog h3 { margin:0 0 var(--s2); font-size:20px; }
+dialog ol { padding-left:20px; color:var(--muted); font-size:14px; }
+dialog ol a { color:var(--link); }
+dialog label { display:block; font-size:13px; font-weight:600; margin:var(--s3) 0 var(--s1); }
+dialog input, dialog select { width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; }
+dialog .hint { font-size:12px; color:var(--muted); margin-top:var(--s1); }
+dialog .acts { display:flex; justify-content:flex-end; gap:var(--s2); margin-top:var(--s5); }
+.err { color:var(--coral); font-size:13px; min-height:1.2em; margin-top:var(--s2); }
+.toast { position:fixed; left:50%; bottom:var(--s5); transform:translateX(-50%); background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:10px 16px; box-shadow:var(--shadow-2); font-size:14px; opacity:0; pointer-events:none; transition:opacity var(--base) ease-out; max-width:calc(100vw - 32px); }
+.toast.show { opacity:1; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="dot" aria-hidden="true"></span>Nova</div>
+    <span class="pill" id="conn">Not connected</span>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="themeBtn" aria-label="Switch light or dark theme">◐</button>
+    <button class="icon-btn" id="setupBtn" aria-label="Open settings">Settings</button>
+  </header>
+
+  <section class="panel" aria-labelledby="teamH">
+    <h2 id="teamH">Teams <span class="count" id="activeCount"></span></h2>
+    <svg id="graph" viewBox="0 0 320 300" role="img" aria-label="Nova and her teams"></svg>
+    <ul class="team-list" id="teamList"><li><div class="skel" style="width:100%"></div></li></ul>
+  </section>
+
+  <main class="center">
+    <div class="orb-wrap">
+      <canvas id="orb" width="880" height="880" aria-hidden="true"></canvas>
+      <button class="orb-btn" id="talkBtn" aria-label="Talk to Nova (hold or tap)"></button>
+    </div>
+    <div class="state" id="state" aria-live="polite">Tap the star and speak</div>
+    <div class="said" id="said" aria-live="polite"></div>
+    <form class="ask" id="askForm">
+      <label class="sr" for="askInput">Type a task for Nova</label>
+      <input id="askInput" autocomplete="off" placeholder="Or type: build a trending extension…">
+      <button type="submit">Send</button>
+    </form>
+    <div class="stats">
+      <div class="stat gold"><b id="sTasks">–</b><span>tasks today</span></div>
+      <div class="stat"><b id="sApprovals">–</b><span>waiting for you</span></div>
+      <div class="stat"><b id="sTeams">–</b><span>teams working</span></div>
+      <div class="stat" id="sAlertsBox"><b id="sAlerts">–</b><span>alerts</span></div>
+    </div>
+  </main>
+
+  <aside class="side">
+    <section class="panel" aria-labelledby="apprH">
+      <h2 id="apprH">Needs your YES <span class="count" id="apprCount"></span></h2>
+      <ul class="appr" id="approvals"><li class="skel"></li></ul>
+    </section>
+    <section class="panel" aria-labelledby="feedH">
+      <h2 id="feedH">Communications <span class="count">live</span></h2>
+      <ul class="feed" id="feed"><li class="skel"></li><li class="skel"></li><li class="skel"></li></ul>
+    </section>
+  </aside>
+</div>
+
+<dialog id="setup" aria-labelledby="setupH">
+  <form method="dialog" id="setupForm">
+    <h3 id="setupH">Connect Nova</h3>
+    <ol>
+      <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → new fine-grained token</a>.</li>
+      <li>Repository access: <b>Only select repositories → nova-hq</b>.</li>
+      <li>Permissions: <b>Contents: Read and write</b>, <b>Pull requests: Read and write</b>.</li>
+      <li>Generate, copy, paste below. It stays only on this device.</li>
+    </ol>
+    <label for="fToken">GitHub token</label>
+    <input id="fToken" type="password" autocomplete="off" placeholder="github_pat_…" required>
+    <label for="fRepo">Nova HQ repository</label>
+    <input id="fRepo" value="Mangesh347/nova-hq" required>
+    <label for="fName">Who is talking</label>
+    <select id="fName"><option>Mangesh</option><option>Shreya</option></select>
+    <label for="fLang">I speak in</label>
+    <select id="fLang">
+      <option value="hi-IN">Hindi / Hinglish</option>
+      <option value="en-IN">English (India)</option>
+    </select>
+    <div class="hint">Nova's voice follows this language. Voice works best in Chrome.</div>
+    <div class="err" id="setupErr" role="alert"></div>
+    <div class="acts">
+      <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn" id="saveSetup" value="save">Connect</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* ═════════════ Settings (device-only) ═════════════ */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('nova.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('nova.' + k, JSON.stringify(v)); } catch {} },
+};
+const cfg = () => ({ token: store.get('token', ''), repo: store.get('repo', 'Mangesh347/nova-hq'),
+  name: store.get('name', 'Mangesh'), lang: store.get('lang', 'hi-IN') });
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('show'), 3200); }
+
+/* ═════════════ GitHub API ═════════════ */
+async function gh(path, opts = {}) {
+  const { token, repo } = cfg();
+  const url = path.startsWith('http') ? path : `https://api.github.com/repos/${repo}${path}`;
+  const res = await fetch(url, { ...opts, cache: 'no-store', headers: {
+    Authorization: `Bearer ${token}`, Accept: opts.raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
+  if (res.status === 404) return null;
+  if (res.status === 401) throw new Error('Your GitHub token was rejected. Open Settings and paste a new one.');
+  if (res.status === 403) throw new Error('GitHub refused (no permission or rate limit). Check the token permissions in Settings.');
+  if (!res.ok) throw new Error(`GitHub error ${res.status}. Try again in a minute.`);
+  return opts.raw ? res.text() : res.json();
+}
+const readFile = (p) => gh(`/contents/${p}?ref=main&_=${Date.now()}`, { raw: true });
+const b64 = (s) => { const b = new TextEncoder().encode(s); let r = ''; b.forEach(x => r += String.fromCharCode(x)); return btoa(r); };
+
+async function sendTask(text) {
+  const { name } = cfg();
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  const id = `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${Math.random().toString(36).slice(2,6)}`;
+  const branch = `nova-task/${id}`;
+  const main = await gh('/git/ref/heads/main');
+  await gh('/git/refs', { method: 'POST', body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: main.object.sha }) });
+  const body = `---\nid: ${id}\nfrom: ${name}\nsent: ${d.toISOString()}\nvia: Nova Command Center (voice)\n---\n${text}\n`;
+  await gh(`/contents/inbox/tasks/${id}.md`, { method: 'PUT', body: JSON.stringify({ message: `Voice task from ${name}`, content: b64(body), branch }) });
+  await gh('/pulls', { method: 'POST', body: JSON.stringify({ title: `Nova task: ${text.slice(0, 60)}`, head: branch, base: 'main', body: `${name} said:\n\n> ${text}` }) });
+  const tasks = store.get('tasks', []); tasks.unshift({ id, text, from: name, at: d.toISOString() }); store.set('tasks', tasks.slice(0, 50));
+  return id;
+}
+
+/* ═════════════ Voice ═════════════ */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let listening = false, rec = null, mic = { level: 0 };
+function speak(text) {
+  if (!('speechSynthesis' in window) || !text) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text.replace(/[*_#`>|]/g, ''));
+  const { lang } = cfg(); u.lang = lang; u.rate = 1.02; u.pitch = 1.05;
+  const v = speechSynthesis.getVoices().find(x => x.lang === lang) || speechSynthesis.getVoices().find(x => x.lang.startsWith(lang.slice(0, 2)));
+  if (v) u.voice = v;
+  u.onstart = () => setMode('speaking'); u.onend = () => setMode(pending.size ? 'thinking' : 'idle');
+  speechSynthesis.speak(u);
+}
+async function startMicLevel() {
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const ctx = new (window.AudioContext || window.webkitAudioContext)(); const an = ctx.createAnalyser(); an.fftSize = 256;
+    ctx.createMediaStreamSource(s).connect(an); const buf = new Uint8Array(an.frequencyBinCount);
+    mic.stop = () => { s.getTracks().forEach(t => t.stop()); ctx.close(); mic.level = 0; };
+    (function tick() { if (!listening) return; an.getByteFrequencyData(buf); mic.level = buf.reduce((a, b) => a + b, 0) / buf.length / 128; requestAnimationFrame(tick); })();
+  } catch { /* level meter is optional */ }
+}
+function listen() {
+  if (!cfg().token) return openSetup();
+  if (!SR) { toast('Voice input needs Chrome. You can type below instead.'); $('askInput').focus(); return; }
+  if (listening) { rec && rec.stop(); return; }
+  speechSynthesis && speechSynthesis.cancel();
+  rec = new SR(); rec.lang = cfg().lang; rec.interimResults = true; rec.maxAlternatives = 1;
+  let finalText = '';
+  rec.onresult = (e) => { let t = ''; for (const r of e.results) { t += r[0].transcript; if (r.isFinal) finalText = t; } showSaid('You', t); };
+  rec.onerror = (e) => { if (e.error === 'not-allowed') toast('Allow microphone access to talk to Nova.'); else if (e.error !== 'no-speech') toast('Could not hear that. Tap the star and try again.'); };
+  rec.onend = () => { listening = false; mic.stop && mic.stop(); setMode(pending.size ? 'thinking' : 'idle'); if (finalText.trim()) handle(finalText.trim()); };
+  listening = true; setMode('listening'); startMicLevel(); rec.start();
+}
+function showSaid(who, text, nova) { const el = $('said'); el.className = 'said' + (nova ? ' nova' : ''); el.innerHTML = `<span class="who">${esc(who)}</span>${esc(text)}`; }
+
+/* ═════════════ Brain: instant local answers + cloud tasks ═════════════ */
+const pending = new Map();   // id -> text
+let data = { status: [], approvals: [], alerts: [] };
+const isHindi = () => cfg().lang === 'hi-IN';
+function localAnswer(t) {
+  const s = t.toLowerCase();
+  if (/(status|kya chal|update|report|haal)/.test(s) && s.split(' ').length < 9) {
+    const busy = data.status.filter(r => r.on).map(r => r.team);
+    return isHindi()
+      ? `Sir, ${busy.length ? busy.join(', ') + ' team abhi kaam kar rahi hai.' : 'abhi koi team kaam par nahi hai, sab ready hain.'} ${data.approvals.length} cheezein aapke YES ka intezaar kar rahi hain.`
+      : `Sir, ${busy.length ? busy.join(', ') + ' are working right now.' : 'every team is idle and ready.'} ${data.approvals.length} items are waiting for your approval.`;
+  }
+  if (/(approval|pending|baaki|yes ke liye)/.test(s) && !/^\s*(yes|no)\b/.test(s)) {
+    if (!data.approvals.length) return isHindi() ? 'Sir, abhi kuch bhi approval ke liye nahi ruka.' : 'Sir, nothing is waiting for approval.';
+    return (isHindi() ? `Sir, ${data.approvals.length} cheezein ruki hain. Pehli: ` : `Sir, ${data.approvals.length} items wait. First: `) + data.approvals[0].what;
+  }
+  return null;
+}
+async function handle(text) {
+  const quick = localAnswer(text);
+  if (quick) { showSaid('Nova', quick, true); speak(quick); return; }
+  try {
+    setMode('thinking');
+    const id = await sendTask(text); pending.set(id, text); addFeed({ from: cfg().name, to: 'Nova', text, at: new Date().toISOString() });
+    const ack = isHindi() ? 'Theek hai sir, samajh gayi. Team ko kaam de diya hai, jawab aate hi bataungi.' : 'Got it, sir. The team is on it. I will tell you the moment it is done.';
+    showSaid('Nova', ack, true); speak(ack); updateStats(); pollReply(id, Date.now());
+  } catch (e) { setMode('idle'); showSaid('Nova', e.message, true); toast(e.message); }
+}
+async function pollReply(id, started) {
+  try {
+    const raw = await readFile(`inbox/replies/${id}.md`);
+    if (raw) {
+      pending.delete(id);
+      const [spoken, details] = raw.replace(/^---[\s\S]*?---\s*/, '').split(/\n\s*DETAILS:/);
+      showSaid('Nova', spoken.trim(), true); speak(spoken.trim());
+      addFeed({ from: 'Nova', to: cfg().name, text: spoken.trim() + (details ? ' · details in HQ' : ''), at: new Date().toISOString(), nova: true });
+      refresh(); return;
+    }
+  } catch { /* retry */ }
+  if (Date.now() - started > 45 * 60e3) { pending.delete(id); toast('Nova is taking long on that one — the answer will appear in the feed.'); setMode('idle'); return; }
+  setTimeout(() => pollReply(id, started), 15000);
+}
+
+/* ═════════════ Data from HQ ═════════════ */
+const TEAMS = [
+  { key: 'Extensions', short: 'Ext', agents: ['ext-scout', 'ext-designer', 'ext-builder', 'ext-qa', 'ext-publisher'] },
+  { key: 'Play Apps', short: 'Apps', agents: ['app-scout', 'app-builder', 'app-qa', 'play-publisher'] },
+  { key: 'Social Media', short: 'Social', agents: ['content-strategist', 'script-writer', 'video-producer', 'social-publisher'] },
+  { key: 'Growth', short: 'Grow', agents: ['marketing-lead', 'support-agent'] },
+  { key: 'Ops', short: 'Ops', agents: ['finance-analyst', 'qa-auditor'] },
+];
+const ACTIVE_WORDS = /(running|building|in progress|working|scouting|testing|producing|writing|started)/i;
+function parseTable(md) {
+  return md.split('\n').filter(l => /^\|/.test(l) && !/^\|\s*-/.test(l)).slice(1)
+    .map(l => l.split('|').slice(1, -1).map(c => c.trim()));
+}
+async function refresh() {
+  const { token } = cfg(); if (!token) return;
+  try {
+    const [status, appr, alerts, commits] = await Promise.all([
+      readFile('company/STATUS.md'), readFile('company/APPROVALS.md'), readFile('company/ALERTS.md'),
+      gh(`/commits?per_page=25&_=${Date.now()}`)]);
+    data.status = parseTable(status || '').map(r => ({ team: r[0], state: r[1] || '', last: r[2] || '', on: ACTIVE_WORDS.test(r[1] || '') }));
+    data.approvals = parseTable(appr || '').filter(r => /pending/i.test(r[5] || '')).map(r => ({ id: r[0], team: r[2], what: r[3], files: r[4] }));
+    data.alerts = (alerts || '').split('\n').filter(l => /^- \d{4}-/.test(l)).map(l => { const [at, say, todo] = l.slice(2).split('|').map(x => x.trim()); return { at, say, todo }; });
+    data.commits = (commits || []).map(c => ({ msg: c.commit.message.split('\n')[0], at: c.commit.author.date, sha: c.sha.slice(0, 7) }));
+    $('conn').textContent = 'Live'; $('conn').className = 'pill live';
+    renderTeams(); renderApprovals(); renderFeed(); updateStats(); checkAlerts();
+  } catch (e) { $('conn').textContent = 'Offline'; $('conn').className = 'pill off'; toast(e.message); }
+}
+function updateStats() {
+  const today = new Date().toISOString().slice(0, 10);
+  $('sTasks').textContent = store.get('tasks', []).filter(t => t.at.startsWith(today)).length;
+  $('sApprovals').textContent = data.approvals.length;
+  $('sTeams').textContent = `${data.status.filter(r => r.on).length}/${TEAMS.length}`;
+  $('sAlerts').textContent = data.alerts.length; $('sAlertsBox').classList.toggle('warn', data.alerts.length > 0);
+}
+
+/* ═════════════ Renderers ═════════════ */
+function renderTeams() {
+  const svg = $('graph'), W = 320, cx = W / 2;
+  const on = Object.fromEntries(data.status.map(r => [r.team.toLowerCase(), r.on]));
+  let html = '';
+  const teamX = TEAMS.map((_, i) => 34 + i * ((W - 68) / (TEAMS.length - 1)));
+  TEAMS.forEach((t, i) => {
+    const active = !!on[t.key.toLowerCase()];
+    html += `<path class="edge${active ? ' on' : ''}" d="M${cx} 52 C ${cx} 90, ${teamX[i]} 80, ${teamX[i]} 118"/>`;
+    t.agents.forEach((a, j) => { const y = 168 + j * 26; html += `<path class="edge${active ? ' on' : ''}" d="M${teamX[i]} 136 L ${teamX[i]} ${y - 9}"/>`; });
+  });
+  html += node(cx, 34, 'Nova', 'chief', data.status.some(r => r.on) || pending.size > 0, 88);
+  TEAMS.forEach((t, i) => {
+    const active = !!on[t.key.toLowerCase()];
+    html += node(teamX[i], 127, t.short, active ? 'busy' : 'idle', active, 58);
+    t.agents.forEach((a, j) => { html += `<g class="node${active ? ' on' : ''}"><circle class="led" cx="${teamX[i]}" cy="${168 + j * 26}" r="3.5"/><title>${a}</title></g>`; });
+  });
+  svg.innerHTML = html;
+  $('activeCount').textContent = `${data.status.filter(r => r.on).length} working`;
+  $('teamList').innerHTML = data.status.length
+    ? data.status.map(r => `<li><span>${esc(r.team)}</span><span>${esc(r.state)}</span></li>`).join('')
+    : '<li class="empty">No status yet — the first run fills this in.</li>';
+}
+function node(x, y, label, sub, active, w) {
+  return `<g class="node${active ? ' on' : ''}"><rect x="${x - w / 2}" y="${y - 16}" width="${w}" height="32" rx="8"/>
+    <circle class="led" cx="${x - w / 2 + 9}" cy="${y}" r="3"/><text x="${x - w / 2 + 17}" y="${y - 2}">${esc(label)}</text>
+    <text class="sub" x="${x - w / 2 + 17}" y="${y + 10}">${esc(sub)}</text></g>`;
+}
+function renderApprovals() {
+  $('apprCount').textContent = data.approvals.length || '';
+  $('approvals').innerHTML = data.approvals.length ? data.approvals.map(a => `
+    <li><span class="id">${esc(a.id)} · ${esc(a.team)}</span><p>${esc(a.what)}</p>
+      <div class="row"><button class="btn" data-yes="${esc(a.id)}">Approve</button><button class="btn no" data-no="${esc(a.id)}">Reject</button></div></li>`).join('')
+    : '<li class="empty">Nothing is waiting for you. Teams will ask here before anything goes public.</li>';
+}
+let extraFeed = store.get('feed', []);
+function addFeed(m) { extraFeed.unshift(m); extraFeed = extraFeed.slice(0, 40); store.set('feed', extraFeed); renderFeed(); }
+function ago(iso) { const s = (Date.now() - new Date(iso)) / 1000; return s < 60 ? 'now' : s < 3600 ? `${s / 60 | 0}m` : s < 86400 ? `${s / 3600 | 0}h` : `${s / 86400 | 0}d`; }
+function renderFeed() {
+  const items = [
+    ...extraFeed.map(m => ({ ...m, kind: m.nova ? 'nova' : '' })),
+    ...(data.alerts || []).slice(0, 5).map(a => ({ from: 'Nova', to: 'Founders', text: `⚠ ${a.say} — ${a.todo || ''}`, at: a.at, kind: 'alert' })),
+    ...(data.commits || []).map(c => ({ from: 'Nova', to: teamOf(c.msg), text: c.msg, at: c.at, kind: '' })),
+  ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 40);
+  $('feed').innerHTML = items.length ? items.map(m => `<li class="msg ${m.kind}"><div class="meta"><span class="route"><b>${esc(m.from)}</b> → <span class="to">${esc(m.to)}</span></span><span>${ago(m.at)}</span></div><p>${esc(m.text)}</p></li>`).join('')
+    : '<li class="empty">Quiet so far. Say "status" or give Nova a task.</li>';
+}
+function teamOf(msg) {
+  const m = msg.toLowerCase();
+  if (/ext|extension|chrome/.test(m)) return 'Extensions'; if (/app|play|flutter/.test(m)) return 'Play Apps';
+  if (/content|video|youtube|social|script/.test(m)) return 'Social Media'; if (/audit|metric|finance/.test(m)) return 'Ops';
+  if (/voice task|inbox|reply/.test(m)) return 'Inbox'; return 'HQ';
+}
+
+/* Alerts = Nova "calling" you: speak new ones out loud + notification */
+function checkAlerts() {
+  const seen = store.get('seenAlerts', []);
+  const fresh = data.alerts.filter(a => !seen.includes(a.at));
+  if (!fresh.length) return;
+  store.set('seenAlerts', [...seen, ...fresh.map(a => a.at)].slice(-100));
+  const a = fresh[0]; const line = `Sir, ek zaroori baat. ${a.say}. ${a.todo || ''}`;
+  showSaid('Nova · alert', line, true); speak(line);
+  try { if (Notification.permission === 'granted') new Notification('Nova', { body: a.say, icon: 'icon.svg' }); } catch {}
+}
+
+/* ═════════════ Orb (signature: a living nova star) ═════════════ */
+let mode = 'idle';
+const MODE_TEXT = { idle: 'Tap the star and speak', listening: 'Listening…', thinking: 'Team is working…', speaking: 'Nova is speaking' };
+function setMode(m) { mode = m; $('state').textContent = MODE_TEXT[m]; }
+(function orb() {
+  const c = $('orb'), g = c.getContext('2d'), N = c.width, C = N / 2;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rays = Array.from({ length: 72 }, (_, i) => ({ a: i / 72 * Math.PI * 2, len: .5 + Math.random() * .5, sp: .5 + Math.random() }));
+  let t = 0, energy = 0;
+  function frame() {
+    t += reduce ? 0 : 1 / 60;
+    const css = getComputedStyle(document.documentElement);
+    const gold = css.getPropertyValue('--gold').trim() || '#FFC857', violet = css.getPropertyValue('--violet').trim() || '#8B7CF6';
+    const target = mode === 'listening' ? .35 + mic.level * 1.4 : mode === 'speaking' ? .55 + Math.sin(t * 9) * .25 : mode === 'thinking' ? .45 : .22 + Math.sin(t * 1.2) * .05;
+    energy += (target - energy) * .12;
+    g.clearRect(0, 0, N, N);
+    const halo = g.createRadialGradient(C, C, N * .05, C, C, N * .5);
+    halo.addColorStop(0, violet + '55'); halo.addColorStop(.55, violet + '14'); halo.addColorStop(1, 'transparent');
+    g.fillStyle = halo; g.fillRect(0, 0, N, N);
+    g.save(); g.translate(C, C); if (mode === 'thinking') g.rotate(t * .8);
+    g.lineCap = 'round';
+    rays.forEach(r => {
+      const wob = Math.sin(t * 2 * r.sp + r.a * 3) * .5 + .5;
+      const L = N * (.12 + energy * .32 * r.len * (.6 + wob * .4));
+      const x1 = Math.cos(r.a) * N * .1, y1 = Math.sin(r.a) * N * .1;
+      const grad = g.createLinearGradient(x1, y1, Math.cos(r.a) * L, Math.sin(r.a) * L);
+      grad.addColorStop(0, gold + 'ee'); grad.addColorStop(1, gold + '00');
+      g.strokeStyle = grad; g.lineWidth = N * .006 * (1 + wob);
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(Math.cos(r.a) * L, Math.sin(r.a) * L); g.stroke();
+    });
+    g.restore();
+    const core = g.createRadialGradient(C, C, 0, C, C, N * (.11 + energy * .04));
+    core.addColorStop(0, '#FFFFFF'); core.addColorStop(.35, gold); core.addColorStop(1, gold + '00');
+    g.fillStyle = core; g.beginPath(); g.arc(C, C, N * (.11 + energy * .04), 0, Math.PI * 2); g.fill();
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+/* ═════════════ Wiring ═════════════ */
+function openSetup() {
+  const c = cfg(); $('fToken').value = c.token; $('fRepo').value = c.repo; $('fName').value = c.name; $('fLang').value = c.lang;
+  $('setupErr').textContent = ''; $('setup').showModal();
+}
+$('setupForm').addEventListener('submit', async (e) => {
+  if (e.submitter && e.submitter.value === 'cancel') return;
+  e.preventDefault();
+  store.set('token', $('fToken').value.trim()); store.set('repo', $('fRepo').value.trim());
+  store.set('name', $('fName').value); store.set('lang', $('fLang').value);
+  $('saveSetup').disabled = true; $('saveSetup').textContent = 'Checking…';
+  try {
+    const r = await gh(''); if (!r) throw new Error('Repository not found. Check the name and that the token can see it.');
+    $('setup').close(); toast('Connected to Nova HQ'); refresh();
+    if (!window.__poll) window.__poll = setInterval(refresh, 60000);
+    try { Notification.requestPermission(); } catch {}
+  } catch (err) { $('setupErr').textContent = err.message; }
+  finally { $('saveSetup').disabled = false; $('saveSetup').textContent = 'Connect'; }
+});
+$('setupBtn').onclick = openSetup;
+$('talkBtn').onclick = listen;
+$('askForm').addEventListener('submit', (e) => { e.preventDefault(); const v = $('askInput').value.trim(); if (!v) return; if (!cfg().token) return openSetup(); $('askInput').value = ''; showSaid('You', v); handle(v); });
+$('approvals').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  const id = b.dataset.yes || b.dataset.no; const word = b.dataset.yes ? 'YES' : 'NO';
+  b.disabled = true; showSaid('You', `${word} ${id}`); handle(`${word} ${id}`);
+});
+$('themeBtn').onclick = () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  const next = cur === 'light' ? 'dark' : 'light'; document.documentElement.dataset.theme = next; store.set('theme', next);
+};
+document.addEventListener('keydown', (e) => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); listen(); } if (e.key === 'Escape' && listening) rec.stop(); });
+if (store.get('theme')) document.documentElement.dataset.theme = store.get('theme');
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => {};
+// resume answers still pending from before a reload
+store.get('tasks', []).slice(0, 5).forEach(t => { if (Date.now() - new Date(t.at) < 45 * 60e3) { pending.set(t.id, t.text); pollReply(t.id, new Date(t.at).getTime()); } });
+renderFeed();
+if (!cfg().token) { setTimeout(openSetup, 300); $('conn').textContent = 'Not connected'; }
+else { refresh(); window.__poll = setInterval(refresh, 60000); }
+</script>
+</body>
+</html>

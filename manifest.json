@@ -1,0 +1,10 @@
+{
+  "name": "Nova Command Center",
+  "short_name": "Nova",
+  "description": "Talk to Nova and watch every team work live.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0A0D18",
+  "theme_color": "#0A0D18",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
